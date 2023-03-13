@@ -42,7 +42,7 @@ public final class Monster implements Readable, Writable {
     }
 
     public int getLevel() {
-        return 1;
+        return (int) Math.floor(((float) exp / (float) species.getExp()) * 99.0F + 1.0F);
     }
 
     public static Monster createFrom(DataInput dataInput) throws IOException {
