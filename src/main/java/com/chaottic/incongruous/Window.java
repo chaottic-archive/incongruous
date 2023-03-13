@@ -91,7 +91,7 @@ public final class Window {
 
             glClear(GL_COLOR_BUFFER_BIT);
 
-            fontDrawer.draw(List.of(""), projection, view, model);
+            fontDrawer.draw(List.of("hello world"), projection, view, model);
 
             glfwSwapBuffers(window);
 

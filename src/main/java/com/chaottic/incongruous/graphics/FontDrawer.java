@@ -1,6 +1,5 @@
 package com.chaottic.incongruous.graphics;
 
-import com.chaottic.incongruous.graphics.ProgramPipeline;
 import org.joml.Matrix4f;
 import org.lwjgl.system.MemoryStack;
 
@@ -17,20 +16,22 @@ public final class FontDrawer {
     private final int vao;
     private final int vbo;
     private final int ebo;
+    private final int ssbo;
 
     {
         try (MemoryStack stack = MemoryStack.stackPush()) {
             {
-                var buffer = stack.callocInt(3);
+                var buffer = stack.callocInt(4);
 
                 var address = memAddress(buffer);
 
                 nglCreateVertexArrays(1, address);
-                nglCreateBuffers(2, address + 4);
+                nglCreateBuffers(3, address + 4);
 
                 vao = buffer.get(0);
                 vbo = buffer.get(1);
                 ebo = buffer.get(2);
+                ssbo = buffer.get(3);
             }
 
             {
@@ -64,6 +65,15 @@ public final class FontDrawer {
                 memFree(buffer);
             }
 
+            // No DSA equivalent.
+            glBindVertexArray(vao);
+            glBindBuffer(GL_SHADER_STORAGE_BUFFER, ssbo);
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, ssbo);
+
+            glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+
+            glBindVertexArray(0);
+
             glVertexArrayVertexBuffer(vao, 0, vbo, 0, 16);
 
             glVertexArrayElementBuffer(vao, ebo);
@@ -75,6 +85,10 @@ public final class FontDrawer {
     }
 
     public void draw(List<String> list, Matrix4f projection, Matrix4f view, Matrix4f model) {
+        var sum = list.stream().mapToInt(String::length).sum();
+
+        translate(list, sum);
+
         glBindProgramPipeline(pipeline.pipeline());
 
         pipeline.uploadMatrices(projection, view, model);
@@ -83,7 +97,7 @@ public final class FontDrawer {
 
         glEnableVertexArrayAttrib(vao, 0);
 
-        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+        glDrawElementsInstanced(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0, sum);
 
         glDisableVertexArrayAttrib(vao, 0);
 
@@ -92,22 +106,23 @@ public final class FontDrawer {
         glBindProgramPipeline(0);
     }
 
-    private void translate(List<String> list) {
-        var sum = list.stream().mapToInt(String::length).sum();
-
+    private void translate(List<String> list, int sum) {
         var buffer = memCalloc(64 * sum);
 
         var matrix4f = new Matrix4f();
 
+        var size = 8.0F / 64.0F;
+
         for (byte[] bytes : list.stream().map(s -> s.getBytes(StandardCharsets.UTF_8)).toList()) {
-            for (int i = 0; i < bytes.length; i++) {
-
+            for (var j = 0; j < bytes.length; j++) {
                 matrix4f.identity();
-                matrix4f.translate(0.0F, 0.0F, 0.0F);
+                matrix4f.translate(size * j, 0.0F, 0.0F);
 
-                matrix4f.get(64 * i, buffer);
+                matrix4f.get(64 * j, buffer);
             }
         }
+
+        glNamedBufferData(ssbo, buffer, GL_DYNAMIC_DRAW);
 
         memFree(buffer);
     }
